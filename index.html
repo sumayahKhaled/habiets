@@ -68,40 +68,38 @@
                         <i class="fa-solid fa-gear"></i>
                     </button>
 
-                    <div class="welcome-header">
-                        <p class="welcome-text">
-                            <span class="font-bold text-slate-900">{{ userName ? 'أهلاً ' + userName : 'أهلاً' }}</span>
-                            <span class="block text-slate-500">• {{ currentGreetingText }}</span>
-                        </p>
+                    <div class="welcome-text">
+                        <div class="font-bold text-slate-900">{{ userName ? 'أهلاً ' + userName : 'أهلاً' }}</div>
+                        <div class="text-slate-500">• {{ currentGreetingText }}</div>
+                    </div>
+
+                    <!-- Breadcrumb Navigation & Notification Button -->
+                    <div class="flex items-center gap-2">
+                        <button @click="toggleNotifications"
+                            :class="notificationsEnabled ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
+                            class="px-3 py-1.5 rounded-xl border text-xs transition flex items-center gap-1.5 font-bold">
+                            <i
+                                :class="notificationsEnabled ? 'fa-solid fa-bell text-amber-500' : 'fa-regular fa-bell-slash'"></i>
+                            <span class="hidden sm:inline">{{ notificationsEnabled ? 'الإشعارات مفعلة' : 'تفعيل
+                                الإشعارات'
+                                }}</span>
+                        </button>
+
+                        <button v-if="challenge.isCreated" @click="currentStep = 'dashboard'"
+                            :class="currentStep === 'dashboard' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'"
+                            class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span class="hidden sm:inline">لوحة التحدي</span>
+                        </button>
+
+                        <button v-if="challenge.isCreated" @click="currentStep = 'builder'"
+                            :class="currentStep === 'builder' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'"
+                            class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span class="hidden sm:inline">الأدوات والمهام</span>
+                        </button>
                     </div>
                 </div>
-
-                <!-- Breadcrumb Navigation & Notification Button -->
-                <div class="flex items-center gap-2">
-                    <button @click="toggleNotifications"
-                        :class="notificationsEnabled ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
-                        class="px-3 py-1.5 rounded-xl border text-xs transition flex items-center gap-1.5 font-bold">
-                        <i
-                            :class="notificationsEnabled ? 'fa-solid fa-bell text-amber-500' : 'fa-regular fa-bell-slash'"></i>
-                        <span class="hidden sm:inline">{{ notificationsEnabled ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات'
-                            }}</span>
-                    </button>
-
-                    <button v-if="challenge.isCreated" @click="currentStep = 'dashboard'"
-                        :class="currentStep === 'dashboard' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'"
-                        class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-gauge-high"></i>
-                        <span class="hidden sm:inline">لوحة التحدي</span>
-                    </button>
-
-                    <button v-if="challenge.isCreated" @click="currentStep = 'builder'"
-                        :class="currentStep === 'builder' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'"
-                        class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-list-check"></i>
-                        <span class="hidden sm:inline">الأدوات والمهام</span>
-                    </button>
-                </div>
-            </div>
         </header>
 
         <!-- Main Body Container -->
