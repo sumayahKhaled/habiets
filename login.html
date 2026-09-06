@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - تحدياتي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        tailwind.config = {
+            theme: { extend: { fontFamily: { ibm: ['IBM Plex Sans Arabic', 'sans-serif'] } } }
+        };
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-ibm">
+    <main id="auth-app" class="auth-page">
+        <section class="auth-card">
+            <div class="text-center mb-6">
+                <div class="auth-logo"><i class="fa-solid fa-trophy text-xl"></i></div>
+                <h1 class="text-2xl font-extrabold text-slate-900">{{ mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب' }}</h1>
+                <p class="text-xs text-slate-500 mt-1">احفظ تحدياتك وبياناتك بأمان على السحابة</p>
+            </div>
+
+            <form @submit.prevent="mode === 'login' ? login() : register()" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-800 mb-1">البريد الإلكتروني</label>
+                    <input v-model.trim="email" class="auth-input" type="email" required autocomplete="email" placeholder="name@example.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-800 mb-1">كلمة المرور</label>
+                    <input v-model="password" class="auth-input" type="password" required minlength="6" autocomplete="current-password" placeholder="6 أحرف على الأقل">
+                </div>
+                <p v-if="error" class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">{{ error }}</p>
+                <button type="submit" :disabled="loading" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-sm transition">
+                    {{ loading ? 'جاري التنفيذ...' : (mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب') }}
+                </button>
+            </form>
+
+            <div class="flex items-center gap-3 my-5 text-xs text-slate-400">
+                <span class="h-px bg-slate-200 flex-1"></span><span>أو</span><span class="h-px bg-slate-200 flex-1"></span>
+            </div>
+
+            <button @click="loginWithGoogle" :disabled="loading" class="w-full py-3 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-800 font-bold text-sm transition flex items-center justify-center gap-2">
+                <i class="fa-brands fa-google text-red-500"></i><span>الدخول باستخدام Google</span>
+            </button>
+            <button @click="toggleMode" class="w-full mt-4 text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+                {{ mode === 'login' ? 'ليس لديك حساب؟ إنشاء حساب جديد' : 'لديك حساب؟ تسجيل الدخول' }}
+            </button>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyALMYNz8Cnl1DLWlFl2N4jYuVFW7rYh7Ik",
+            authDomain: "habits-89324.firebaseapp.com",
+            projectId: "habits-89324",
+            storageBucket: "habits-89324.firebasestorage.app",
+            messagingSenderId: "925221729578",
+            appId: "1:925221729578:web:8798fcc42d47d089c05a53",
+            measurementId: "G-R0MHT7DKCF"
+        };
+        const auth = getAuth(initializeApp(firebaseConfig));
+        const { createApp } = Vue;
+
+        createApp({
+            data: () => ({ mode: 'login', email: '', password: '', loading: false, error: '' }),
+            mounted() {
+                onAuthStateChanged(auth, user => {
+                    if (user) window.location.href = 'index.html';
+                });
+            },
+            methods: {
+                toggleMode() { this.mode = this.mode === 'login' ? 'register' : 'login'; this.error = ''; },
+                errorMessage(error) {
+                    const messages = {
+                        'auth/invalid-credential': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+                        'auth/email-already-in-use': 'هذا البريد مستخدم من قبل.',
+                        'auth/weak-password': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.',
+                        'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة.',
+                        'auth/popup-closed-by-user': 'تم إغلاق نافذة Google قبل إتمام الدخول.',
+                        'auth/popup-blocked': 'المتصفح منع نافذة Google. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.'
+                    };
+                    return messages[error.code] || 'حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى.';
+                },
+                async login() {
+                    this.loading = true; this.error = '';
+                    try { await signInWithEmailAndPassword(auth, this.email, this.password); }
+                    catch (error) { this.error = this.errorMessage(error); }
+                    finally { this.loading = false; }
+                },
+                async register() {
+                    this.loading = true; this.error = '';
+                    try { await createUserWithEmailAndPassword(auth, this.email, this.password); }
+                    catch (error) { this.error = this.errorMessage(error); }
+                    finally { this.loading = false; }
+                },
+                async loginWithGoogle() {
+                    this.loading = true; this.error = '';
+                    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+                    catch (error) { this.error = this.errorMessage(error); }
+                    finally { this.loading = false; }
+                }
+            }
+        }).mount('#auth-app');
+    </script>
+</body>
+</html>

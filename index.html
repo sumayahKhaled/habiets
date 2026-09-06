@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة تحدياتي - بناء وتتبع التحديات مع Firebase</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (IBM Plex Sans Arabic) -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- html2pdf Library for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        ibm: ['IBM Plex Sans Arabic', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-ibm">
+
+    <div id="app" class="min-h-screen flex flex-col justify-between">
+
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center space-x-3 space-x-reverse cursor-pointer" @click="goHome">
+                    <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-md">
+                        <i class="fa-solid fa-trophy text-lg text-amber-400"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-extrabold text-slate-900">تحدياتي</h1>
+                            <span v-if="syncStatus === 'synced'" class="w-2.5 h-2.5 rounded-full bg-emerald-500" title="متزامن مع السحابة"></span>
+                            <span v-else-if="syncStatus === 'syncing'" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" title="جاري المزامنة..."></span>
+                            <span v-else class="w-2.5 h-2.5 rounded-full bg-slate-300" title="غير متصل"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium">مزامنة سحابية وإشعارات حية</p>
+                    </div>
+                </div>
+
+                <!-- Breadcrumb Navigation & Notification Button -->
+                <div class="flex items-center gap-2">
+                    <button @click="toggleNotifications" 
+                        :class="notificationsEnabled ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
+                        class="px-3 py-1.5 rounded-xl border text-xs transition flex items-center gap-1.5 font-bold">
+                        <i :class="notificationsEnabled ? 'fa-solid fa-bell text-amber-500' : 'fa-regular fa-bell-slash'"></i>
+                        <span class="hidden sm:inline">{{ notificationsEnabled ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات' }}</span>
+                    </button>
+
+                    <button v-if="challenge.isCreated" @click="currentStep = 'dashboard'" 
+                        :class="currentStep === 'dashboard' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'"
+                        class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-gauge-high"></i>
+                        <span class="hidden sm:inline">لوحة التحدي</span>
+                    </button>
+
+                    <button v-if="challenge.isCreated" @click="currentStep = 'builder'" 
+                        :class="currentStep === 'builder' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'"
+                        class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span class="hidden sm:inline">الأدوات والمهام</span>
+                    </button>
+
+                    <button v-if="challenge.isCreated" @click="currentStep = 'settings'" 
+                        :class="currentStep === 'settings' ? 'bg-slate-900 text-white font-bold shadow-sm' : 'text-slate-600 hover:bg-slate-100'"
+                        class="px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>الإعدادات</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Body Container -->
+        <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-grow">
+
+            <section v-if="currentStep === 'setup'" class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
+                    <div class="mb-6 text-center">
+                        <span class="inline-block px-3 py-1 bg-slate-100 text-slate-700 font-bold text-xs rounded-full mb-2">الخطوة 1 من 2</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900">صمّم تحديك الجديد (Firebase)</h2>
+                        <p class="text-slate-500 text-xs mt-1">تزامن لحظي لكل بيانات التحدي عبر كافة أجهزتك</p>
+                    </div>
+
+                    <form @submit.prevent="proceedToTaskBuilder" class="space-y-5">
+                        <!-- Challenge Name -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-800 mb-1">اسم التحدي <span class="text-rose-500">*</span></label>
+                            <input type="text" v-model="form.title" required placeholder="مثال: تحدي الفصل الدراسي، تحدي اللياقة البدنية..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 transition text-xs font-medium">
+                        </div>
+
+                        <!-- Objectives / Summary -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-800 mb-1">نبذة عن التحدي وأهدافه <span class="text-rose-500">*</span></label>
+                            <textarea v-model="form.description" rows="3" required placeholder="اكتب أهداف التحدي وما تريد إنجازه والتزامك به..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 transition text-xs font-medium"></textarea>
+                        </div>
+
+                        <!-- Dates: Start & End -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-800 mb-1">تاريخ البداية <span class="text-rose-500">*</span></label>
+                                <input type="date" v-model="form.startDate" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 transition text-xs font-bold">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-800 mb-1">تاريخ النهاية <span class="text-rose-500">*</span></label>
+                                <input type="date" v-model="form.endDate" :min="form.startDate" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 transition text-xs font-bold">
+                            </div>
+                        </div>
+
+                        <!-- Day Selection Filter (Specific Days) -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-800 mb-1">أيام النشاط المحددة بالجدول <span class="text-rose-500">*</span></label>
+                            <p class="text-[11px] text-slate-500 mb-2">سيعرض جدول التحدي هذه الأيام المحددة حصراً لمنع التشتت بباقي الأيام.</p>
+                            <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                                <button type="button" v-for="day in weekDays" :key="day.id" @click="toggleDaySelection(day.id)"
+                                    :class="form.selectedDays.includes(day.id) ? 'bg-slate-900 text-white font-bold border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
+                                    class="py-2 px-1 text-center border rounded-xl transition text-xs flex flex-col items-center justify-center gap-1">
+                                    <span>{{ day.short }}</span>
+                                    <i :class="form.selectedDays.includes(day.id) ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-300'" class="fa-solid text-[10px]"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Reward Input -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-800 mb-1">جائزة التحدي عند الإكمال <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <input type="text" v-model="form.reward" required placeholder="مثال: شراء مكافأة خاصة، رحلة ترفيهية، يوم استراحة..." class="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 transition text-xs font-medium">
+                                <i class="fa-solid fa-gift absolute right-3.5 top-3 text-amber-500 text-sm"></i>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-1">تظل الجائزة مقفلة وتفتح احتفالياً عند إنجاز التحدي.</p>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="w-full py-3.5 px-6 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition flex items-center justify-center gap-2 mt-4 shadow-sm">
+                            <span>التالي: إنشاء أدوات ومهام التحدي</span>
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <section v-else-if="currentStep === 'builder'" class="max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-100">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-slate-100 text-slate-700 font-bold text-xs rounded-full mb-1">الخطوة 2 من 2</span>
+                            <h2 class="text-2xl font-extrabold text-slate-900">إنشاء أدوات ومهام التحدي</h2>
+                            <p class="text-slate-500 text-xs mt-0.5">أضف المهام اليومية أو حدد أياماً مخصصة لمهمة مثل جدول الجامعة أو التمرين</p>
+                        </div>
+
+                        <button @click="finishTaskBuilderAndGoToDashboard" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2">
+                            <span>حفظ والمزامنة السحابية</span>
+                            <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+                        <!-- Add Tool Form -->
+                        <div class="lg:col-span-5 space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-plus-circle text-slate-700"></i>
+                                <span>إضافة أداة / مهمة جديدة</span>
+                            </h3>
+
+                            <form @submit.prevent="addNewTask" class="space-y-4">
+                                <!-- Tool Name -->
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-800 mb-1">اسم المهمة / الأداة <span class="text-rose-500">*</span></label>
+                                    <input type="text" v-model="newTask.title" required placeholder="مثال: محاضرة البرمجة، تمريني الرياضي، قراءة كتاب..." class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-800 bg-white">
+                                </div>
+
+                                <!-- Tool Type Selection -->
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-800 mb-1">نوع أداة التتبع <span class="text-rose-500">*</span></label>
+                                    <div class="grid grid-cols-1 gap-2 bg-white p-2 rounded-xl border border-slate-200 text-xs">
+                                        <label @click="newTask.type = 'checkbox'" :class="newTask.type === 'checkbox' ? 'bg-slate-100 text-slate-900 border-slate-400 font-bold' : 'text-slate-600 border-transparent hover:bg-slate-50'" class="p-2.5 rounded-lg border cursor-pointer flex items-center gap-2.5 transition">
+                                            <i class="fa-regular fa-square-check text-slate-700 text-base"></i>
+                                            <div>
+                                                <div class="font-bold">مربع اختيار (كل أيام النشاط)</div>
+                                                <div class="text-[10px] text-slate-500 font-normal">تظهر المهمة في جميع أيام التحدي النشطة</div>
+                                            </div>
+                                        </label>
+
+                                        <label @click="newTask.type = 'days'" :class="newTask.type === 'days' ? 'bg-slate-100 text-slate-900 border-slate-400 font-bold' : 'text-slate-600 border-transparent hover:bg-slate-50'" class="p-2.5 rounded-lg border cursor-pointer flex items-center gap-2.5 transition">
+                                            <i class="fa-solid fa-calendar-days text-slate-700 text-base"></i>
+                                            <div>
+                                                <div class="font-bold">أيام مخصصة للمهمة</div>
+                                                <div class="text-[10px] text-slate-500 font-normal">تظهر المهمة حصراً في الأيام المحددة لها بالجدول</div>
+                                            </div>
+                                        </label>
+
+                                        <label @click="newTask.type = 'text'" :class="newTask.type === 'text' ? 'bg-slate-100 text-slate-900 border-slate-400 font-bold' : 'text-slate-600 border-transparent hover:bg-slate-50'" class="p-2.5 rounded-lg border cursor-pointer flex items-center gap-2.5 transition">
+                                            <i class="fa-solid fa-pen-to-square text-slate-700 text-base"></i>
+                                            <div>
+                                                <div class="font-bold">إدخال كتابي / ملاحظات</div>
+                                                <div class="text-[10px] text-slate-500 font-normal">لتدوين تقرير أو ملخص يومي</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Dynamic Task Days Selector -->
+                                <div v-if="newTask.type === 'days'" class="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                                    <label class="block text-[11px] font-bold text-slate-800">حدد الأيام التي تطبق فيها هذه المهمة:</label>
+                                    <div class="grid grid-cols-4 gap-1.5">
+                                        <button type="button" v-for="day in weekDays" :key="day.id" @click="toggleNewTaskDay(day.id)"
+                                            :class="newTask.taskDays.includes(day.id) ? 'bg-slate-900 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                            class="py-1.5 px-1 text-[11px] rounded-lg transition text-center">
+                                            {{ day.short }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Mandatory Toggle Switch -->
+                                <div class="p-3 bg-rose-50 rounded-xl border border-rose-200 flex items-start gap-2.5">
+                                    <input type="checkbox" id="mandatoryBuilderCheck" v-model="newTask.isMandatory" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer">
+                                    <label for="mandatoryBuilderCheck" class="text-xs cursor-pointer select-none">
+                                        <span class="font-bold text-rose-800 block">هل هذه المهمة إلزامية؟</span>
+                                        <span class="text-[10px] text-slate-600 block mt-0.5">تنبيه: عدم إنجاز المهمة الإلزامية ينبهك مباشرة بكسر التحدي.</span>
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-plus"></i>
+                                    <span>إضافة الأداة للقائمة</span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Current Added Tasks List -->
+                        <div class="lg:col-span-7 space-y-3">
+                            <h3 class="font-bold text-slate-800 text-sm flex items-center justify-between">
+                                <span class="flex items-center gap-2">
+                                    <i class="fa-solid fa-layer-group text-slate-700"></i>
+                                    <span>أدوات ومهام التحدي المضافة ({{ challenge.tasks.length }})</span>
+                                </span>
+                                <span class="text-xs text-slate-400 font-normal">جاهزة للمزامنة</span>
+                            </h3>
+
+                            <div v-if="challenge.tasks.length === 0" class="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                                <i class="fa-solid fa-cubes text-slate-300 text-3xl mb-2"></i>
+                                <p class="text-xs font-bold text-slate-600">لم تقم بإضافة أي أدوات حتى الآن</p>
+                                <p class="text-[11px] text-slate-400 mt-1">استخدم النموذج بالجانب لإضافة أدوات الرياضة، الجامعة، أو العادات</p>
+                            </div>
+
+                            <div v-else class="space-y-2.5">
+                                <div v-for="task in challenge.tasks" :key="task.id" class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-slate-300 transition flex items-center justify-between">
+                                    <div class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-extrabold text-slate-800">{{ task.title }}</span>
+                                            <span v-if="task.isMandatory" class="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-md border border-rose-200 flex items-center gap-1">
+                                                <i class="fa-solid fa-circle-exclamation"></i> إلزامية
+                                            </span>
+                                            <span v-else class="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded-md">
+                                                اختيارية
+                                            </span>
+                                        </div>
+
+                                        <div class="text-[11px] text-slate-500 flex items-center gap-2">
+                                            <span v-if="task.type === 'checkbox'" class="text-slate-700 font-semibold"><i class="fa-regular fa-square-check"></i> كل أيام التحدي</span>
+                                            <span v-else-if="task.type === 'days'" class="text-slate-700 font-semibold"><i class="fa-solid fa-calendar-days"></i> أيام محددة: {{ getTaskDaysFormatted(task.taskDays) }}</span>
+                                            <span v-else-if="task.type === 'text'" class="text-slate-700 font-semibold"><i class="fa-solid fa-pen"></i> كتابة نصية</span>
+                                        </div>
+                                    </div>
+
+                                    <button @click="removeTask(task.id)" class="text-slate-400 hover:text-rose-600 transition p-2 text-xs">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section v-else-if="currentStep === 'dashboard'" class="space-y-6">
+
+                <!-- Clean, Solid Header Banner with Cloud Status -->
+                <div class="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden">
+                    <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div class="space-y-2 max-w-2xl">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    مزامنة حية نشطة
+                                </span>
+                                <span class="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-medium">
+                                    {{ formatDateArabic(challenge.startDate) }} - {{ formatDateArabic(challenge.endDate) }}
+                                </span>
+                            </div>
+
+                            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">{{ challenge.title }}</h2>
+                            <p class="text-slate-300 text-xs sm:text-sm leading-relaxed line-clamp-2">{{ challenge.description }}</p>
+                        </div>
+
+                        <!-- Reward Lock Badge Box -->
+                        <div @click="checkRewardStatus" class="cursor-pointer group bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl p-4 text-center min-w-[200px] transition">
+                            <div class="text-amber-400 mb-1 text-2xl group-hover:scale-110 transition duration-200">
+                                <i :class="isChallengeFinished ? 'fa-solid fa-gift' : 'fa-solid fa-lock'"></i>
+                            </div>
+                            <div class="text-[11px] text-slate-400 font-medium mb-0.5">جائزة التحدي المقفلة</div>
+                            <div class="text-xs sm:text-sm font-bold text-white">
+                                <span v-if="isChallengeFinished" class="text-amber-300">{{ challenge.reward }}</span>
+                                <span v-else class="text-slate-300">تفتح بنهاية التحدي</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date & Timeline Navigation Bar -->
+                    <div class="mt-6 pt-6 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-right">
+                        <!-- Current Day Counter -->
+                        <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+                                <i class="fa-solid fa-calendar-day"></i>
+                            </div>
+                            <div>
+                                <div class="text-[11px] text-slate-400">موقعك بالتحدي</div>
+                                <div class="text-sm sm:text-base font-extrabold text-white">اليوم <span class="text-emerald-400">{{ currentDayIndex }}</span> من أصل {{ totalDaysCount }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Remaining Days -->
+                        <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-lg">
+                                <i class="fa-solid fa-hourglass-half"></i>
+                            </div>
+                            <div>
+                                <div class="text-[11px] text-slate-400">الوقت المتبقي</div>
+                                <div class="text-sm sm:text-base font-extrabold text-white">متبقي <span class="text-indigo-300">{{ remainingDaysCount }}</span> يوم</div>
+                            </div>
+                        </div>
+
+                        <!-- Interactive Date Modifier -->
+                        <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                            <div class="flex justify-between items-center text-[11px] text-slate-300 mb-1">
+                                <span class="font-bold flex items-center gap-1">
+                                    <i class="fa-solid fa-clock text-amber-400"></i> تاريخ اليوم بالمشاهدة:
+                                </span>
+                                <button @click="resetToRealToday" class="text-[10px] text-emerald-400 hover:underline">اليوم الفعلي</button>
+                            </div>
+                            <input type="date" v-model="simulatedToday" @change="updateSimulatedTodayInCloud" :min="challenge.startDate" :max="challenge.endDate" 
+                                class="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-bold text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar & Actions Bar -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-emerald-600"></i>
+                                <span>مؤشر التارجت والتقدم الكلي</span>
+                            </h3>
+                            <p class="text-[11px] text-slate-500">نسبة إنجاز المهام المطلوبة للأيام النشطة بالجدول</p>
+                        </div>
+                        
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl font-extrabold text-emerald-600 ml-2">{{ overallProgressPercent }}%</span>
+                            
+                            <!-- Trigger Notification Reminder Test -->
+                            <button @click="sendTaskReminderNotification" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-amber-200">
+                                <i class="fa-solid fa-bell text-amber-600"></i>
+                                <span>تذكير حثي</span>
+                            </button>
+
+                            <!-- Statistics Modal Trigger Button -->
+                            <button @click="showStatsModal = true" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-slate-200">
+                                <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+                                <span>الإحصائيات</span>
+                            </button>
+
+                            <!-- Export Data Trigger Button -->
+                            <button @click="exportChallengeData" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-slate-200">
+                                <i class="fa-solid fa-file-export text-slate-700"></i>
+                                <span>تصدير البيانات</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                        <div class="h-full bg-emerald-600 rounded-full transition-all duration-500 ease-out"
+                            :style="{ width: overallProgressPercent + '%' }"></div>
+                    </div>
+
+                    <div class="flex justify-between text-[11px] text-slate-500 font-medium pt-1">
+                        <span>البداية: {{ formatDateArabic(challenge.startDate) }}</span>
+                        <span>هدف التخرج: 100% إنجاز</span>
+                        <span>الختام: {{ formatDateArabic(challenge.endDate) }}</span>
+                    </div>
+                </div>
+
+                <!-- Daily Tasks & Schedule Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- Main Daily Checklist Area -->
+                    <div class="lg:col-span-2 space-y-6">
+
+                        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                                        <i class="fa-solid fa-list-check text-slate-800"></i>
+                                        <span>مهام اليوم المحدد ({{ getDayNameArabic(simulatedToday) }})</span>
+                                    </h3>
+                                    <p class="text-[11px] text-slate-500">تزامن فوري عند الضغط على أي عنصر عبر Firestore</p>
+                                </div>
+
+                                <span v-if="isDaySelected(simulatedToday)" class="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-200">
+                                    يوم نشط بالتحدي
+                                </span>
+                                <span v-else class="px-2.5 py-1 bg-amber-50 text-amber-800 text-xs font-bold rounded-lg border border-amber-200">
+                                    يوم استراحة (غير مخصص)
+                                </span>
+                            </div>
+
+                            <!-- Rest Day Alert -->
+                            <div v-if="!isDaySelected(simulatedToday)" class="p-6 bg-slate-50 rounded-xl border border-slate-200 text-center py-10">
+                                <i class="fa-solid fa-mug-hot text-3xl text-slate-400 mb-2"></i>
+                                <h4 class="font-bold text-slate-700 text-xs sm:text-sm">هذا اليوم ليس ضمن الأيام المحددة لتحديك</h4>
+                                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">يمكنك الاستراحة اليوم أو تغيير التاريخ لمعاينة الأيام النشطة بالجدول.</p>
+                            </div>
+
+                            <!-- Tasks Checklist -->
+                            <div v-else class="space-y-3">
+                                <div v-if="todaysApplicableTasks.length === 0" class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                                    <i class="fa-solid fa-cube text-slate-300 text-3xl mb-2"></i>
+                                    <p class="text-xs font-semibold text-slate-600">لا توجد مهام مخصصة لهذا اليوم المحدد</p>
+                                    <button @click="currentStep = 'builder'" class="mt-2 text-xs font-bold text-slate-800 hover:underline">انقر هنا لإضافة وتعديل المهام والأدوات</button>
+                                </div>
+
+                                <div v-for="task in todaysApplicableTasks" :key="task.id" 
+                                    :class="isTaskCompleted(simulatedToday, task.id) ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200'"
+                                    class="p-4 rounded-xl border transition space-y-3">
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-slate-800">{{ task.title }}</span>
+                                            <span v-if="task.isMandatory" class="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-extrabold rounded-md border border-rose-200 flex items-center gap-1">
+                                                <i class="fa-solid fa-circle-exclamation"></i> إلزامية
+                                            </span>
+                                            <span v-if="task.type === 'days'" class="px-2 py-0.5 bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-md">
+                                                يوم خاص
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Checkbox task -->
+                                    <div v-if="task.type === 'checkbox' || task.type === 'days'" @click="toggleTaskLog(simulatedToday, task.id)" 
+                                        class="cursor-pointer flex items-center gap-3 p-2.5 rounded-lg bg-white border border-slate-200 hover:border-slate-400 transition">
+                                        <div :class="isTaskCompleted(simulatedToday, task.id) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-slate-300 text-transparent'"
+                                            class="w-5 h-5 rounded-md border flex items-center justify-center transition text-xs">
+                                            <i class="fa-solid fa-check"></i>
+                                        </div>
+                                        <span class="text-xs font-bold text-slate-700">
+                                            {{ isTaskCompleted(simulatedToday, task.id) ? 'تم الإنجاز بنجاح' : 'اضغط للتعليم كمنجز' }}
+                                        </span>
+                                    </div>
+
+                                    <!-- Text Input Task -->
+                                    <div v-else-if="task.type === 'text'" class="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                                        <label class="block text-[11px] font-bold text-slate-700">تدوين الإنجاز أو الملخص اليومي (اكتب واضغط Enter للحفظ):</label>
+                                        <div class="flex gap-2">
+                                            <input type="text" 
+                                                v-model="textInputs[task.id]" 
+                                                @keyup.enter="addTextLogEntry(simulatedToday, task.id)"
+                                                placeholder="اكتب الملاحظة واضغط Enter..." 
+                                                class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-800 bg-slate-50 transition">
+                                            <button type="button" @click="addTextLogEntry(simulatedToday, task.id)" class="px-3.5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition whitespace-nowrap">
+                                                إضافة
+                                            </button>
+                                        </div>
+
+                                        <!-- Saved Entries Box Underneath -->
+                                        <div v-if="getTaskTextEntries(simulatedToday, task.id).length > 0" class="mt-2 space-y-1.5 pt-2 border-t border-slate-100">
+                                            <div class="text-[10px] font-bold text-emerald-700 flex items-center gap-1.5">
+                                                <i class="fa-solid fa-circle-check"></i>
+                                                <span>النصوص والملخصات المدونة:</span>
+                                            </div>
+                                            <div class="space-y-1">
+                                                <div v-for="(entry, index) in getTaskTextEntries(simulatedToday, task.id)" :key="index" class="p-2 bg-emerald-50/80 rounded-lg border border-emerald-200 flex justify-between items-center text-xs">
+                                                    <span class="text-slate-800 font-semibold break-all">{{ entry }}</span>
+                                                    <button type="button" @click="removeTextLogEntry(simulatedToday, task.id, index)" title="حذف" class="text-slate-400 hover:text-rose-600 transition pr-2 text-xs">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Days Table -->
+                        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <div class="mb-4">
+                                <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                                    <i class="fa-solid fa-calendar-days text-slate-700"></i>
+                                    <span>جدول الأيام المحددة حصراً</span>
+                                </h3>
+                                <p class="text-[11px] text-slate-500">يعرض الجدول الأيام النشطة المحددة بالتحدي فقط دون استعراض بقية الأيام</p>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-right text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                            <th class="py-2.5 px-4 font-bold rounded-r-xl">اليوم</th>
+                                            <th class="py-2.5 px-4 font-bold">التاريخ</th>
+                                            <th class="py-2.5 px-4 font-bold">الحالة الإنجازية</th>
+                                            <th class="py-2.5 px-4 font-bold rounded-l-xl text-center">الإجراء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <tr v-for="dayObj in filteredActiveDaysList" :key="dayObj.dateStr" 
+                                            :class="dayObj.dateStr === simulatedToday ? 'bg-slate-100/70 font-semibold' : 'hover:bg-slate-50'">
+                                            <td class="py-2.5 px-4 font-bold text-slate-800 flex items-center gap-2">
+                                                <span v-if="dayObj.dateStr === simulatedToday" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                {{ dayObj.dayName }}
+                                            </td>
+                                            <td class="py-2.5 px-4 text-slate-600">{{ dayObj.formattedDate }}</td>
+                                            <td class="py-2.5 px-4">
+                                                <span :class="dayObj.statusClass" class="px-2 py-0.5 rounded-md text-[10px] font-bold inline-block">
+                                                    {{ dayObj.statusText }}
+                                                </span>
+                                            </td>
+                                            <td class="py-2.5 px-4 text-center">
+                                                <button @click="changeSimulatedToday(dayObj.dateStr)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[10px] font-bold transition border border-slate-200">
+                                                    عرض اليوم
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Right Column: Notes & Quick Links -->
+                    <div class="space-y-6">
+
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm mb-1 flex items-center gap-2">
+                                <i class="fa-solid fa-note-sticky text-amber-500"></i>
+                                <span>ملاحظات ومدونة التحدي</span>
+                            </h3>
+                            <p class="text-[11px] text-slate-500 mb-3">سجل انطباعاتك اليومية وعزيمتك طوال التحدي (تتزامن فوراً)</p>
+
+                            <textarea v-model="challenge.notes" @input="saveToFirestore" rows="6" placeholder="اكتب ملاحظاتك هنا..." class="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-slate-800 bg-slate-50 text-slate-800"></textarea>
+                        </div>
+
+                        <!-- Manage Tasks Card -->
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-3">
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-sliders text-slate-700"></i>
+                                <span>إدارة مهام التحدي</span>
+                            </h3>
+                            <p class="text-[11px] text-slate-500">هل تريد إضافة مهام جديدة أو تعديل المهام الحالية؟</p>
+
+                            <button @click="currentStep = 'builder'" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                                <span>تعديل وإضافة المهام</span>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+            </section>
+
+            <section v-else-if="currentStep === 'settings'" class="max-w-3xl mx-auto space-y-6">
+                <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+                    
+                    <div class="pb-4 border-b border-slate-100 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-gear text-slate-700"></i>
+                                <span>الإعدادات وإدارة التحدي والمزامنة</span>
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">تحكم بالإشعارات والربط السحابي مع Firebase</p>
+                        </div>
+
+                        <button @click="currentStep = 'dashboard'" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition border border-slate-200">
+                            رجوع للوحة التحدي
+                        </button>
+                    </div>
+
+                    <!-- User Profile & Firebase Status Card -->
+                    <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                                <i class="fa-solid fa-cloud"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm text-slate-800">حساب Firebase المتصل</h3>
+                                <p class="text-xs text-slate-500 break-all">معرف المستخدم: {{ currentUserId || 'جاري الاتصال...' }}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-lg border border-emerald-200 flex items-center gap-1">
+                                <i class="fa-solid fa-check"></i> مزامنة Firestore معتمدة
+                            </span>
+                            <button @click="logout" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] rounded-lg border border-rose-200 transition">
+                                <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Notification Toggle Box -->
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-bell text-amber-500"></i>
+                                <span>إشعارات المتصفح والتذكيرات اليومية</span>
+                            </h4>
+                            <p class="text-[11px] text-slate-500 mt-0.5">استلام إشعارات فورية وتنبيهات المهام غير المنجزة</p>
+                        </div>
+
+                        <button @click="toggleNotifications" :class="notificationsEnabled ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'" class="px-4 py-2 rounded-xl text-xs font-bold transition">
+                            {{ notificationsEnabled ? 'مفعلة ✓' : 'تفعيل الإشعارات' }}
+                        </button>
+                    </div>
+
+                    <!-- Actions Area -->
+                    <div class="space-y-4">
+                        <h3 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">إجراءات التحديات</h3>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Create New Challenge -->
+                            <div @click="startNewChallengeSetup" class="p-4 rounded-xl border border-slate-200 hover:border-slate-400 bg-white hover:bg-slate-50 cursor-pointer transition space-y-2">
+                                <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center text-sm">
+                                    <i class="fa-solid fa-plus"></i>
+                                </div>
+                                <h4 class="font-bold text-xs text-slate-800">إنشاء تحدي جديد</h4>
+                                <p class="text-[11px] text-slate-500">البدء بتصميم تحدي جديد من الخطوة الأولى</p>
+                            </div>
+
+                            <!-- Reset Progress Only -->
+                            <div @click="resetProgressOnly" class="p-4 rounded-xl border border-slate-200 hover:border-amber-400 bg-white hover:bg-amber-50/20 cursor-pointer transition space-y-2">
+                                <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center text-sm">
+                                    <i class="fa-solid fa-rotate-right"></i>
+                                </div>
+                                <h4 class="font-bold text-xs text-slate-800">إعادة تعيين التقدم السحابي</h4>
+                                <p class="text-[11px] text-slate-500">تصفير سجل المهام والإحصائيات والبدء مجدداً</p>
+                            </div>
+                        </div>
+
+                        <!-- Delete Challenge -->
+                        <div class="pt-4 border-t border-slate-100">
+                            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div>
+                                    <h4 class="font-bold text-xs text-rose-800 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        <span>إلغاء أو حذف التحدي الحالي</span>
+                                    </h4>
+                                    <p class="text-[11px] text-slate-600 mt-0.5">حذف بيانات التحدي تماماً من Firestore والبدء من جديد.</p>
+                                </div>
+
+                                <button @click="deleteCurrentChallenge" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-sm transition whitespace-nowrap">
+                                    حذف التحدي
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+
+        <!-- MODAL 1: WEEKLY STATISTICS MODAL -->
+        <div v-if="showStatsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 relative overflow-hidden space-y-4">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                    <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+                        <span>الإحصائيات والتقرير الأسبوعي</span>
+                    </h3>
+                    <button @click="showStatsModal = false" class="text-slate-400 hover:text-slate-600 p-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-center">
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div class="text-[11px] text-slate-500 font-bold">إجمالي المهام المنجزة</div>
+                        <div class="text-xl font-extrabold text-emerald-600 mt-1">{{ totalStats.completedCount }}</div>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div class="text-[11px] text-slate-500 font-bold">المهام المتبقية / المعلقة</div>
+                        <div class="text-xl font-extrabold text-amber-600 mt-1">{{ totalStats.pendingCount }}</div>
+                    </div>
+                </div>
+
+                <!-- Weeks Breakdown List -->
+                <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <h4 class="text-xs font-bold text-slate-800 mb-2">تفاصيل الأسباب حسب الأسابيع:</h4>
+                    <div v-for="week in weeklyStatsList" :key="week.weekNumber" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                        <div class="flex justify-between items-center font-bold text-slate-800">
+                            <span>الأسبوع {{ week.weekNumber }} ({{ week.startDateFormatted }} - {{ week.endDateFormatted }})</span>
+                            <span class="text-emerald-600 font-extrabold">{{ week.percent }}%</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-500 rounded-full" :style="{ width: week.percent + '%' }"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-500">
+                            <span>منجز: {{ week.completed }}</span>
+                            <span>معلق: {{ week.pending }}</span>
+                            <span>إجمالي المطلوبات: {{ week.total }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="showStatsModal = false" class="w-full py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition">
+                    إغلاق
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL 2: REWARD CELEBRATION MODAL -->
+        <div v-if="showRewardModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border border-amber-200 relative overflow-hidden">
+                <div class="w-20 h-20 rounded-full bg-amber-400 text-white flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-amber-400/30">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+
+                <h3 class="text-2xl font-extrabold text-slate-900 mb-1">مبارك! لقد حققت التحدي</h3>
+                <p class="text-xs text-slate-500 mb-4">وصلت لليوم الأخير وأنجزت أهدافك بنجاح باهر.</p>
+
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                    <div class="text-xs font-bold text-amber-800 mb-1">جائزتك المستحقة الآن:</div>
+                    <div class="text-base sm:text-lg font-extrabold text-amber-900">{{ challenge.reward }}</div>
+                </div>
+
+                <button @click="showRewardModal = false" class="w-full py-3 bg-slate-900 text-white font-bold text-xs sm:text-sm rounded-xl hover:bg-slate-800 transition">
+                    استلام الجائزة وإغلاق
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL 3: FAILURE MODAL -->
+        <div v-if="showFailureModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border border-rose-200 relative overflow-hidden">
+                <div class="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+
+                <h3 class="text-2xl font-extrabold text-slate-900 mb-1">انكسر التحدي</h3>
+                <p class="text-xs text-slate-500 mb-4">لم يتم إنجاز المهمة الإلزامية: <span class="font-bold text-rose-600">"{{ failedTaskName }}"</span> في الوقت المحدد.</p>
+
+                <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6 text-xs text-rose-800 font-medium leading-relaxed">
+                    بسبب الشروط الصارمة للتحدي، تم إعادة إحصائيات وسجل التحدي للبداية للتركيز والبدء بعزيمة أقوى.
+                </div>
+
+                <button @click="restartChallengeFromBeginning" class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>البدء من جديد الآن</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 mt-8">
+            <p>منصة تحدياتي - متزامنة حياً عبر Cloud Firestore مع دعم الإشعارات</p>
+        </footer>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+        // Firebase Configuration Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'habits-89324';
+        const firebaseConfig = {
+            apiKey: "AIzaSyALMYNz8Cnl1DLWlFl2N4jYuVFW7rYh7Ik",
+            authDomain: "habits-89324.firebaseapp.com",
+            projectId: "habits-89324",
+            storageBucket: "habits-89324.firebasestorage.app",
+            messagingSenderId: "925221729578",
+            appId: "1:925221729578:web:8798fcc42d47d089c05a53",
+            measurementId: "G-R0MHT7DKCF"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentStep: 'setup', // 'setup', 'builder', 'dashboard', 'settings'
+                    showStatsModal: false,
+                    showRewardModal: false,
+                    showFailureModal: false,
+                    failedTaskName: '',
+                    notificationsEnabled: false,
+                    syncStatus: 'synced', // 'synced', 'syncing', 'offline'
+                    currentUserId: null,
+                    unsubscribeFirestore: null,
+                    textInputs: {},
+                    weekDays: [
+                        { id: 0, name: 'الأحد', short: 'أحد' },
+                        { id: 1, name: 'الإثنين', short: 'إثنين' },
+                        { id: 2, name: 'الثلاثاء', short: 'ثلاثاء' },
+                        { id: 3, name: 'الأربعاء', short: 'أربعاء' },
+                        { id: 4, name: 'الخميس', short: 'خميس' },
+                        { id: 5, name: 'الجمعة', short: 'جمعة' },
+                        { id: 6, name: 'السبت', short: 'سبت' },
+                    ],
+                    form: {
+                        title: '',
+                        description: '',
+                        startDate: new Date().toISOString().split('T')[0],
+                        endDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                        selectedDays: [0, 1, 2, 3, 4],
+                        reward: ''
+                    },
+                    simulatedToday: new Date().toISOString().split('T')[0],
+                    newTask: {
+                        title: '',
+                        type: 'checkbox', // 'checkbox', 'days', 'text'
+                        taskDays: [0, 1, 2, 3, 4],
+                        isMandatory: false
+                    },
+                    challenge: {
+                        isCreated: false,
+                        title: '',
+                        description: '',
+                        startDate: '',
+                        endDate: '',
+                        selectedDays: [],
+                        reward: '',
+                        tasks: [],
+                        logs: {},
+                        notes: '',
+                        simulatedToday: new Date().toISOString().split('T')[0],
+                        userProfile: {
+                            name: 'المستخدم النشط',
+                            email: 'user@challenges.com'
+                        }
+                    }
+                }
+            },
+            computed: {
+                totalDaysCount() {
+                    if (!this.challenge.startDate || !this.challenge.endDate) return 0;
+                    const start = new Date(this.challenge.startDate);
+                    const end = new Date(this.challenge.endDate);
+                    const diffTime = Math.abs(end - start);
+                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                },
+                currentDayIndex() {
+                    if (!this.challenge.startDate) return 1;
+                    const start = new Date(this.challenge.startDate);
+                    const current = new Date(this.simulatedToday);
+                    const diffTime = current - start;
+                    const dayNum = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                    return Math.max(1, Math.min(dayNum, this.totalDaysCount));
+                },
+                remainingDaysCount() {
+                    return Math.max(0, this.totalDaysCount - this.currentDayIndex);
+                },
+                isChallengeFinished() {
+                    return this.remainingDaysCount === 0 || this.overallProgressPercent >= 100;
+                },
+                filteredActiveDaysList() {
+                    if (!this.challenge.startDate || !this.challenge.endDate) return [];
+                    const list = [];
+                    let curr = new Date(this.challenge.startDate);
+                    const end = new Date(this.challenge.endDate);
+
+                    while (curr <= end) {
+                        const dayOfWeek = curr.getDay();
+                        const dateStr = curr.toISOString().split('T')[0];
+
+                        if (this.challenge.selectedDays.includes(dayOfWeek)) {
+                            const isCompleted = this.isDayFullyDone(dateStr);
+                            list.push({
+                                dateStr: dateStr,
+                                dayName: this.weekDays.find(d => d.id === dayOfWeek).name,
+                                formattedDate: this.formatDateArabic(dateStr),
+                                isCompleted: isCompleted,
+                                statusText: isCompleted ? 'منجز بالكامل' : (dateStr === this.simulatedToday ? 'جاري اليوم' : 'معلق'),
+                                statusClass: isCompleted ? 'bg-emerald-100 text-emerald-800' : (dateStr === this.simulatedToday ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600')
+                            });
+                        }
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                    return list;
+                },
+                todaysApplicableTasks() {
+                    return this.challenge.tasks.filter(task => this.isTaskApplicableOnDate(task, this.simulatedToday));
+                },
+                overallProgressPercent() {
+                    if (this.filteredActiveDaysList.length === 0 || this.challenge.tasks.length === 0) return 0;
+                    let totalPossibleCheckmarks = 0;
+                    let completedCheckmarks = 0;
+
+                    this.filteredActiveDaysList.forEach(day => {
+                        this.challenge.tasks.forEach(t => {
+                            if (this.isTaskApplicableOnDate(t, day.dateStr)) {
+                                totalPossibleCheckmarks++;
+                                if (this.isTaskCompleted(day.dateStr, t.id)) {
+                                    completedCheckmarks++;
+                                }
+                            }
+                        });
+                    });
+
+                    if (totalPossibleCheckmarks === 0) return 0;
+                    return Math.round((completedCheckmarks / totalPossibleCheckmarks) * 100) || 0;
+                },
+                totalStats() {
+                    let completedCount = 0;
+                    let pendingCount = 0;
+
+                    this.filteredActiveDaysList.forEach(day => {
+                        this.challenge.tasks.forEach(t => {
+                            if (this.isTaskApplicableOnDate(t, day.dateStr)) {
+                                if (this.isTaskCompleted(day.dateStr, t.id)) {
+                                    completedCount++;
+                                } else {
+                                    pendingCount++;
+                                }
+                            }
+                        });
+                    });
+
+                    return { completedCount, pendingCount };
+                },
+                weeklyStatsList() {
+                    if (!this.challenge.startDate || !this.challenge.endDate) return [];
+                    const activeDays = this.filteredActiveDaysList;
+                    const weeks = [];
+                    let weekNum = 1;
+
+                    for (let i = 0; i < activeDays.length; i += 7) {
+                        const weekDays = activeDays.slice(i, i + 7);
+                        let totalTasks = 0;
+                        let completedTasks = 0;
+
+                        weekDays.forEach(day => {
+                            this.challenge.tasks.forEach(t => {
+                                if (this.isTaskApplicableOnDate(t, day.dateStr)) {
+                                    totalTasks++;
+                                    if (this.isTaskCompleted(day.dateStr, t.id)) {
+                                        completedTasks++;
+                                    }
+                                }
+                            });
+                        });
+
+                        const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                        weeks.push({
+                            weekNumber: weekNum,
+                            startDateFormatted: weekDays[0].formattedDate,
+                            endDateFormatted: weekDays[weekDays.length - 1].formattedDate,
+                            completed: completedTasks,
+                            pending: totalTasks - completedTasks,
+                            total: totalTasks,
+                            percent: percent
+                        });
+                        weekNum++;
+                    }
+
+                    return weeks;
+                }
+            },
+            watch: {
+                simulatedToday(newDate, oldDate) {
+                    if (oldDate && newDate > oldDate) {
+                        this.verifyMandatoryTasksAdherence(oldDate);
+                    }
+                }
+            },
+            async mounted() {
+                if ("Notification" in window && Notification.permission === "granted") {
+                    this.notificationsEnabled = true;
+                }
+                await this.initFirebase();
+            },
+            methods: {
+                // Firebase Initializer
+                async initFirebase() {
+                    try {
+                        onAuthStateChanged(auth, (user) => {
+                            if (user) {
+                                this.currentUserId = user.uid;
+                                this.currentStep = this.challenge.isCreated ? 'dashboard' : 'setup';
+                                this.listenToFirestoreChallenge();
+                            } else {
+                                this.currentUserId = null;
+                                window.location.href = 'login.html';
+                            }
+                        });
+                    } catch (err) {
+                        console.error("Firebase auth error:", err);
+                    }
+                },
+                async logout() {
+                    await signOut(auth);
+                },
+                // Realtime Listener for Firestore Document
+                listenToFirestoreChallenge() {
+                    if (!this.currentUserId) return;
+                    const challengeDocRef = doc(db, 'artifacts', appId, 'users', this.currentUserId, 'challengeData', 'current');
+
+                    this.unsubscribeFirestore = onSnapshot(challengeDocRef, (snapshot) => {
+                        if (snapshot.exists()) {
+                            const data = snapshot.data();
+                            this.challenge = Object.assign({}, this.challenge, data);
+                            if (data.simulatedToday) {
+                                this.simulatedToday = data.simulatedToday;
+                            }
+                            if (this.challenge.isCreated) {
+                                if (this.currentStep === 'setup') {
+                                    this.currentStep = 'dashboard';
+                                }
+                            }
+                            this.syncStatus = 'synced';
+                        }
+                    }, (error) => {
+                        console.error("Firestore listener error:", error);
+                        this.syncStatus = 'offline';
+                    });
+                },
+                // Save State to Cloud Firestore
+                async saveToFirestore() {
+                    if (!this.currentUserId) return;
+                    this.syncStatus = 'syncing';
+                    try {
+                        const challengeDocRef = doc(db, 'artifacts', appId, 'users', this.currentUserId, 'challengeData', 'current');
+                        const dataToSave = JSON.parse(JSON.stringify(this.challenge));
+                        dataToSave.simulatedToday = this.simulatedToday;
+
+                        await setDoc(challengeDocRef, dataToSave, { merge: true });
+                        this.syncStatus = 'synced';
+                    } catch (e) {
+                        console.error("Error saving to Firestore:", e);
+                        this.syncStatus = 'offline';
+                    }
+                },
+                // Web Notifications Switch & Triggering
+                async toggleNotifications() {
+                    if (!("Notification" in window)) {
+                        alert("متصفحك لا يدعم خاصية الإشعارات.");
+                        return;
+                    }
+                    if (Notification.permission === "granted") {
+                        this.notificationsEnabled = !this.notificationsEnabled;
+                        if (this.notificationsEnabled) {
+                            this.sendWebNotification("تم تفعيل الإشعارات", "ستصلك تنبيهات حية لمتابعة إنجاز مهام التحدي.");
+                        }
+                    } else {
+                        const permission = await Notification.requestPermission();
+                        if (permission === "granted") {
+                            this.notificationsEnabled = true;
+                            this.sendWebNotification("تم تفعيل الإشعارات بنجاح", "جاهز لتلقي التنبيهات والتذكيرات اليومية.");
+                        }
+                    }
+                },
+                sendWebNotification(title, body) {
+                    if (this.notificationsEnabled && "Notification" in window && Notification.permission === "granted") {
+                        new Notification(title, {
+                            body: body,
+                            icon: 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png'
+                        });
+                    }
+                },
+                sendTaskReminderNotification() {
+                    const pendingTasks = this.todaysApplicableTasks.filter(t => !this.isTaskCompleted(this.simulatedToday, t.id));
+                    if (pendingTasks.length > 0) {
+                        this.sendWebNotification("تذكير بمهام اليوم 📌", `لديك ${pendingTasks.length} مهام متبقية اليوم تحتاج لإنجازها!`);
+                    } else {
+                        this.sendWebNotification("ممتاز جداً! 🎉", "لقد أتممت كافة المهام المخصصة لليوم بالكامل.");
+                    }
+                },
+                goHome() {
+                    if (this.challenge.isCreated) {
+                        this.currentStep = 'dashboard';
+                    } else {
+                        this.currentStep = 'setup';
+                    }
+                },
+                getFirstActiveDate(startDate, selectedDays) {
+                    if (!startDate || !selectedDays || selectedDays.length === 0) return startDate;
+                    let curr = new Date(startDate);
+                    for (let i = 0; i < 7; i++) {
+                        if (selectedDays.includes(curr.getDay())) {
+                            return curr.toISOString().split('T')[0];
+                        }
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                    return startDate;
+                },
+                toggleDaySelection(dayId) {
+                    const idx = this.form.selectedDays.indexOf(dayId);
+                    if (idx > -1) {
+                        if (this.form.selectedDays.length > 1) {
+                            this.form.selectedDays.splice(idx, 1);
+                        }
+                    } else {
+                        this.form.selectedDays.push(dayId);
+                    }
+                },
+                toggleNewTaskDay(dayId) {
+                    const idx = this.newTask.taskDays.indexOf(dayId);
+                    if (idx > -1) {
+                        if (this.newTask.taskDays.length > 1) {
+                            this.newTask.taskDays.splice(idx, 1);
+                        }
+                    } else {
+                        this.newTask.taskDays.push(dayId);
+                    }
+                },
+                getTaskDaysFormatted(taskDays) {
+                    if (!taskDays || taskDays.length === 0) return '';
+                    return taskDays.map(id => {
+                        const d = this.weekDays.find(w => w.id === id);
+                        return d ? d.short : '';
+                    }).join(' • ');
+                },
+                proceedToTaskBuilder() {
+                    this.challenge.isCreated = true;
+                    this.challenge.title = this.form.title;
+                    this.challenge.description = this.form.description;
+                    this.challenge.startDate = this.form.startDate;
+                    this.challenge.endDate = this.form.endDate;
+                    this.challenge.selectedDays = [...this.form.selectedDays];
+                    this.challenge.reward = this.form.reward;
+
+                    if (this.challenge.tasks.length === 0) {
+                        this.challenge.tasks = [
+                            { id: 1, title: 'جدول دوام الجامعة والمحاضرات', type: 'days', taskDays: [0, 1, 2, 3, 4], isMandatory: true },
+                            { id: 2, title: 'تمريني الرياضي لليوم', type: 'checkbox', isMandatory: false }
+                        ];
+                    }
+
+                    this.simulatedToday = this.getFirstActiveDate(this.challenge.startDate, this.challenge.selectedDays);
+                    this.saveToFirestore();
+                    this.currentStep = 'builder';
+                },
+                finishTaskBuilderAndGoToDashboard() {
+                    this.simulatedToday = this.getFirstActiveDate(this.challenge.startDate, this.challenge.selectedDays);
+                    this.saveToFirestore();
+                    this.currentStep = 'dashboard';
+                },
+                addNewTask() {
+                    if (!this.newTask.title.trim()) return;
+
+                    this.challenge.tasks.push({
+                        id: Date.now(),
+                        title: this.newTask.title.trim(),
+                        type: this.newTask.type,
+                        taskDays: this.newTask.type === 'days' ? [...this.newTask.taskDays] : [],
+                        isMandatory: this.newTask.isMandatory
+                    });
+
+                    this.newTask.title = '';
+                    this.newTask.isMandatory = false;
+                    this.saveToFirestore();
+                },
+                removeTask(taskId) {
+                    this.challenge.tasks = this.challenge.tasks.filter(t => t.id !== taskId);
+                    this.saveToFirestore();
+                },
+                isDaySelected(dateStr) {
+                    const d = new Date(dateStr);
+                    return this.challenge.selectedDays.includes(d.getDay());
+                },
+                getDayNameArabic(dateStr) {
+                    const d = new Date(dateStr);
+                    const dayObj = this.weekDays.find(w => w.id === d.getDay());
+                    return dayObj ? dayObj.name : '';
+                },
+                isTaskApplicableOnDate(task, dateStr) {
+                    if (!this.isDaySelected(dateStr)) return false;
+                    const d = new Date(dateStr);
+                    const dayOfWeek = d.getDay();
+
+                    if (task.type === 'days') {
+                        return task.taskDays && task.taskDays.includes(dayOfWeek);
+                    }
+                    return true;
+                },
+                toggleTaskLog(dateStr, taskId) {
+                    if (!this.challenge.logs) this.challenge.logs = {};
+                    if (!this.challenge.logs[dateStr]) this.challenge.logs[dateStr] = {};
+                    
+                    this.challenge.logs[dateStr][taskId] = !this.challenge.logs[dateStr][taskId];
+                    this.saveToFirestore();
+                },
+                addTextLogEntry(dateStr, taskId) {
+                    const text = (this.textInputs[taskId] || '').trim();
+                    if (!text) return;
+
+                    if (!this.challenge.logs) this.challenge.logs = {};
+                    if (!this.challenge.logs[dateStr]) this.challenge.logs[dateStr] = {};
+                    if (!Array.isArray(this.challenge.logs[dateStr][taskId])) {
+                        const oldVal = this.challenge.logs[dateStr][taskId];
+                        this.challenge.logs[dateStr][taskId] = oldVal && typeof oldVal === 'string' ? [oldVal] : [];
+                    }
+                    
+                    this.challenge.logs[dateStr][taskId].push(text);
+                    this.textInputs[taskId] = '';
+                    this.saveToFirestore();
+                },
+                removeTextLogEntry(dateStr, taskId, index) {
+                    if (this.challenge.logs && this.challenge.logs[dateStr] && Array.isArray(this.challenge.logs[dateStr][taskId])) {
+                        this.challenge.logs[dateStr][taskId].splice(index, 1);
+                        this.saveToFirestore();
+                    }
+                },
+                getTaskTextEntries(dateStr, taskId) {
+                    if (!this.challenge.logs || !this.challenge.logs[dateStr]) return [];
+                    const val = this.challenge.logs[dateStr][taskId];
+                    if (Array.isArray(val)) return val;
+                    if (typeof val === 'string' && val.trim().length > 0) return [val];
+                    return [];
+                },
+                isTaskCompleted(dateStr, taskId) {
+                    const task = this.challenge.tasks.find(t => t.id === taskId);
+                    if (!task || !this.challenge.logs || !this.challenge.logs[dateStr]) return false;
+                    
+                    const log = this.challenge.logs[dateStr][taskId];
+                    if (!log) return false;
+
+                    if (task.type === 'checkbox' || task.type === 'days') {
+                        return !!log;
+                    } else if (task.type === 'text') {
+                        if (Array.isArray(log)) return log.length > 0;
+                        return typeof log === 'string' && log.trim().length > 0;
+                    }
+                    return false;
+                },
+                isDayFullyDone(dateStr) {
+                    const applicableTasks = this.challenge.tasks.filter(t => this.isTaskApplicableOnDate(t, dateStr));
+                    if (applicableTasks.length === 0) return true;
+                    return applicableTasks.every(t => this.isTaskCompleted(dateStr, t.id));
+                },
+                verifyMandatoryTasksAdherence(pastDateStr) {
+                    if (!this.isDaySelected(pastDateStr)) return;
+
+                    const mandatoryTasks = this.challenge.tasks.filter(t => t.isMandatory && this.isTaskApplicableOnDate(t, pastDateStr));
+                    for (let task of mandatoryTasks) {
+                        if (!this.isTaskCompleted(pastDateStr, task.id)) {
+                            this.failedTaskName = task.title;
+                            this.showFailureModal = true;
+                            this.sendWebNotification("انكسر التحدي! ⚠️", `لم يتم إنجاز المهمة الإلزامية (${task.title}).`);
+                            break;
+                        }
+                    }
+                },
+                restartChallengeFromBeginning() {
+                    this.challenge.logs = {};
+                    this.simulatedToday = this.getFirstActiveDate(this.challenge.startDate, this.challenge.selectedDays);
+                    this.showFailureModal = false;
+                    this.saveToFirestore();
+                },
+                resetToRealToday() {
+                    this.simulatedToday = new Date().toISOString().split('T')[0];
+                    this.updateSimulatedTodayInCloud();
+                },
+                changeSimulatedToday(dateStr) {
+                    this.simulatedToday = dateStr;
+                    this.updateSimulatedTodayInCloud();
+                },
+                updateSimulatedTodayInCloud() {
+                    this.saveToFirestore();
+                },
+                checkRewardStatus() {
+                    if (this.isChallengeFinished) {
+                        this.showRewardModal = true;
+                        this.triggerConfetti();
+                        this.sendWebNotification("تهانينا! 🎉", `حققت التحدي بنجاح! جائزتك: ${this.challenge.reward}`);
+                    }
+                },
+                triggerConfetti() {
+                    if (typeof confetti === 'function') {
+                        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                    }
+                },
+                exportChallengeData() {
+                    const element = document.createElement('div');
+                    element.dir = 'rtl';
+                    element.style.padding = '25px';
+                    element.style.fontFamily = "'IBM Plex Sans Arabic', sans-serif";
+                    element.style.color = '#0f172a';
+                    element.style.backgroundColor = '#ffffff';
+                    
+                    let tasksHtml = '';
+                    this.challenge.tasks.forEach((t) => {
+                        tasksHtml += `<li style="margin-bottom: 6px; font-size: 13px;"><strong>${t.title}</strong> <span style="font-size:11px; color: ${t.isMandatory ? '#e11d48' : '#64748b'};">[${t.isMandatory ? 'إلزامية' : 'اختيارية'}]</span></li>`;
+                    });
+
+                    let daysHtml = '';
+                    this.filteredActiveDaysList.forEach(day => {
+                        let taskLogs = '';
+                        this.challenge.tasks.forEach(t => {
+                            if (this.isTaskApplicableOnDate(t, day.dateStr)) {
+                                const done = this.isTaskCompleted(day.dateStr, t.id);
+                                let entriesHtml = '';
+                                if (t.type === 'text') {
+                                    const entries = this.getTaskTextEntries(day.dateStr, t.id);
+                                    if (entries.length > 0) {
+                                        entriesHtml = `<div style="font-size:11px; color:#334155; margin-top:2px; background:#f1f5f9; padding:4px 8px; border-radius:4px;">الملاحظات: ${entries.join(' • ')}</div>`;
+                                    }
+                                }
+                                taskLogs += `<div style="margin-right: 15px; margin-top: 6px; font-size: 12px;">• <strong>${t.title}</strong>: <span style="color: ${done ? '#16a34a' : '#dc2626'}; font-weight: bold;">${done ? 'تم الإنجاز ✓' : 'غير منجز ✕'}</span>${entriesHtml}</div>`;
+                            }
+                        });
+                        daysHtml += `<div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #f8fafc;">
+                            <div style="font-weight: bold; font-size: 13px; color: #0f172a;">${day.dayName} (${day.formattedDate}) - <span style="color:#0284c7;">${day.statusText}</span></div>
+                            ${taskLogs}
+                        </div>`;
+                    });
+
+                    element.innerHTML = `
+                        <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px;">
+                            <h1 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 0;">تقرير تحدياتي (مترابط مع Firebase) - ${this.challenge.title}</h1>
+                            <p style="font-size: 12px; color: #64748b; margin-top: 5px;">${this.challenge.description || ''}</p>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; font-size: 12px; background: #f1f5f9; padding: 12px; border-radius: 8px;">
+                            <div><strong>تاريخ البداية:</strong> ${this.formatDateArabic(this.challenge.startDate)}</div>
+                            <div><strong>تاريخ النهاية:</strong> ${this.formatDateArabic(this.challenge.endDate)}</div>
+                            <div><strong>نسبة الإنجاز الكلية:</strong> ${this.overallProgressPercent}%</div>
+                            <div><strong>الجائزة:</strong> ${this.challenge.reward || 'لا يوجد'}</div>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="font-size: 14px; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; color: #0f172a;">مهام التحدي المعتمدة</h3>
+                            <ol style="padding-right: 20px; margin-top: 8px;">${tasksHtml}</ol>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 14px; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; color: #0f172a;">سجل الأيام والنشاط</h3>
+                            <div style="margin-top: 10px;">${daysHtml}</div>
+                        </div>
+                    `;
+
+                    const opt = {
+                        margin:       10,
+                        filename:     `تقرير_تحدي_${this.challenge.title || 'تحدياتي'}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, useCORS: true },
+                        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+
+                    html2pdf().set(opt).from(element).save();
+                },
+                formatDateArabic(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', year: 'numeric' });
+                },
+                startNewChallengeSetup() {
+                    this.currentStep = 'setup';
+                },
+                resetProgressOnly() {
+                    this.challenge.logs = {};
+                    this.saveToFirestore();
+                    this.currentStep = 'dashboard';
+                },
+                async deleteCurrentChallenge() {
+                    this.challenge = {
+                        isCreated: false,
+                        title: '',
+                        description: '',
+                        startDate: '',
+                        endDate: '',
+                        selectedDays: [],
+                        reward: '',
+                        tasks: [],
+                        logs: {},
+                        notes: '',
+                        simulatedToday: new Date().toISOString().split('T')[0],
+                        userProfile: {
+                            name: 'المستخدم النشط',
+                            email: 'user@challenges.com'
+                        }
+                    };
+                    await this.saveToFirestore();
+                    this.currentStep = 'setup';
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
