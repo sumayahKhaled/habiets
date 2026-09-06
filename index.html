@@ -561,16 +561,14 @@
                                             <i class="fa-solid fa-check"></i>
                                         </div>
                                         <span class="text-xs font-bold text-slate-700">
-                                            {{ isTaskCompleted(simulatedToday, task.id) ? 'تم الإنجاز بنجاح' : 'اضغط
-                                            للتعليم كمنجز' }}
+                                            {{ isTaskCompleted(simulatedToday, task.id) ? 'تم الإنجاز بنجاح' : 'اضغط للتعليم كمنجز' }}
                                         </span>
                                     </div>
 
                                     <!-- Text Input Task -->
                                     <div v-else-if="task.type === 'text'"
                                         class="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                                        <label class="block text-[11px] font-bold text-slate-700">تدوين الإنجاز أو
-                                            الملخص اليومي (اكتب واضغط Enter للحفظ):</label>
+                                        <label class="block text-[11px] font-bold text-slate-700">تدوين الإنجاز أو الملخص اليومي (اكتب واضغط Enter للحفظ):</label>
                                         <div class="flex gap-2">
                                             <input type="text" v-model="textInputs[task.id]"
                                                 @keyup.enter="addTextLogEntry(simulatedToday, task.id)"
@@ -725,8 +723,7 @@
                             </div>
                             <div>
                                 <h3 class="font-bold text-sm text-slate-800">حساب Firebase المتصل</h3>
-                                <p class="text-xs text-slate-500 break-all">معرف المستخدم: {{ currentUserId || 'جاري
-                                    الاتصال...' }}</p>
+                                <p class="text-xs text-slate-500 break-all">معرف المستخدم: {{ currentUserId || 'جاري الاتصال...' }}</p>
                             </div>
                         </div>
 
@@ -763,8 +760,7 @@
                                 <i class="fa-solid fa-bell text-amber-500"></i>
                                 <span>إشعارات المتصفح والتذكيرات اليومية</span>
                             </h4>
-                            <p class="text-[11px] text-slate-500 mt-0.5">استلام إشعارات فورية وتنبيهات المهام غير
-                                المنجزة</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5">استلام إشعارات فورية وتنبيهات المهام غير المنجزة</p>
                         </div>
 
                         <button @click="toggleNotifications"
@@ -1180,7 +1176,7 @@
                         onAuthStateChanged(auth, (user) => {
                             if (user) {
                                 this.currentUserId = user.uid;
-                                const savedName = user.displayName || this.challenge.userProfile?.name || '';
+                                const savedName = user.displayName || '';
                                 this.userName = savedName.trim();
                                 if (this.challenge.userProfile) {
                                     this.challenge.userProfile.name = this.userName || 'المستخدم النشط';
@@ -1236,7 +1232,7 @@
                         if (snapshot.exists()) {
                             const data = snapshot.data();
                             this.challenge = Object.assign({}, this.challenge, data);
-                            if (!this.userName && data.userProfile?.name) {
+                            if (!auth.currentUser?.displayName && data.userProfile?.name) {
                                 this.userName = data.userProfile.name;
                             }
                             if (data.simulatedToday) {
