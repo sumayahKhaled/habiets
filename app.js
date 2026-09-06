@@ -27,8 +27,6 @@ createApp({
             userName: '',
             showStatsModal: false,
             showRewardModal: false,
-            showFailureModal: false,
-            failedTaskName: '',
             notificationsEnabled: false,
             syncStatus: 'synced', // 'synced', 'syncing', 'offline'
             currentUserId: null,
@@ -527,9 +525,6 @@ createApp({
             const mandatoryTasks = this.challenge.tasks.filter(t => t.isMandatory && this.isTaskApplicableOnDate(t, pastDateStr));
             for (let task of mandatoryTasks) {
                 if (!this.isTaskCompleted(pastDateStr, task.id)) {
-                    this.failedTaskName = task.title;
-                    this.showFailureModal = true;
-                    this.sendWebNotification("انكسر التحدي! ⚠️", `لم يتم إنجاز المهمة الإلزامية (${task.title}).`);
                     break;
                 }
             }
@@ -537,7 +532,6 @@ createApp({
         restartChallengeFromBeginning() {
             this.challenge.logs = {};
             this.simulatedToday = this.getFirstActiveDate(this.challenge.startDate, this.challenge.selectedDays);
-            this.showFailureModal = false;
             this.saveToFirestore();
         },
         resetToRealToday() {

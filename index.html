@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>منصة تحدياتي - بناء وتتبع التحديات مع Firebase</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="tailwind.generated.css">
     <!-- Vue 3 CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts (IBM Plex Sans Arabic) -->
@@ -20,17 +20,6 @@
     <!-- html2pdf Library for PDF Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        ibm: ['IBM Plex Sans Arabic', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
     <style>
         body {
             font-family: 'IBM Plex Sans Arabic', sans-serif;
@@ -80,9 +69,7 @@
                             class="px-3 py-1.5 rounded-xl border text-xs transition flex items-center gap-1.5 font-bold">
                             <i
                                 :class="notificationsEnabled ? 'fa-solid fa-bell text-amber-500' : 'fa-regular fa-bell-slash'"></i>
-                            <span class="hidden sm:inline">{{ notificationsEnabled ? 'الإشعارات مفعلة' : 'تفعيل
-                                الإشعارات'
-                                }}</span>
+                            <span class="hidden sm:inline">{{ notificationsEnabled ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات' }}</span>
                         </button>
 
                         <button v-if="challenge.isCreated" @click="currentStep = 'dashboard'"
@@ -902,33 +889,6 @@
                 <button @click="showRewardModal = false"
                     class="w-full py-3 bg-slate-900 text-white font-bold text-xs sm:text-sm rounded-xl hover:bg-slate-800 transition">
                     استلام الجائزة وإغلاق
-                </button>
-            </div>
-        </div>
-
-        <!-- MODAL 3: FAILURE MODAL -->
-        <div v-if="showFailureModal"
-            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-            <div
-                class="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border border-rose-200 relative overflow-hidden">
-                <div
-                    class="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
-
-                <h3 class="text-2xl font-extrabold text-slate-900 mb-1">انكسر التحدي</h3>
-                <p class="text-xs text-slate-500 mb-4">لم يتم إنجاز المهمة الإلزامية: <span
-                        class="font-bold text-rose-600">"{{ failedTaskName }}"</span> في الوقت المحدد.</p>
-
-                <div
-                    class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6 text-xs text-rose-800 font-medium leading-relaxed">
-                    بسبب الشروط الصارمة للتحدي، تم إعادة إحصائيات وسجل التحدي للبداية للتركيز والبدء بعزيمة أقوى.
-                </div>
-
-                <button @click="restartChallengeFromBeginning"
-                    class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-rotate-right"></i>
-                    <span>البدء من جديد الآن</span>
                 </button>
             </div>
         </div>
