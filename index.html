@@ -50,8 +50,8 @@
     <div id="app" class="min-h-screen flex flex-col justify-between">
 
         <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-            <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
-                <div class="flex items-center gap-3 min-w-0">
+            <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
+                <div class="flex items-center gap-3 shrink-0">
                     <button @click="currentStep = 'settings'" class="settings-button" title="الإعدادات"
                         aria-label="الإعدادات">
                         <i class="fa-solid fa-gear"></i>
@@ -61,9 +61,12 @@
                         <div class="font-bold text-slate-900">{{ userName ? 'أهلاً ' + userName : 'أهلاً' }}</div>
                         <div class="text-slate-500">• {{ currentGreetingText }}</div>
                     </div>
+                </div>
 
-                    <!-- Breadcrumb Navigation & Notification Button -->
-                    <div class="flex items-center gap-2">
+                <div class="flex-1 min-w-8"></div>
+
+                <!-- Breadcrumb Navigation & Notification Button -->
+                <div class="flex items-center gap-2 shrink-0">
                         <button @click="toggleNotifications"
                             :class="notificationsEnabled ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
                             class="px-3 py-1.5 rounded-xl border text-xs transition flex items-center gap-1.5 font-bold">
@@ -85,7 +88,6 @@
                             <i class="fa-solid fa-list-check"></i>
                             <span class="hidden sm:inline">الأدوات والمهام</span>
                         </button>
-                    </div>
                 </div>
         </header>
 
