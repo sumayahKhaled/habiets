@@ -49,10 +49,6 @@
                     </button>
 
                     <div class="welcome-header">
-                        <div class="welcome-box">
-                            <label for="appUserName" class="welcome-label">اهلاً</label>
-                            <input id="appUserName" v-model="userName" type="text" maxlength="30" placeholder="اكتب اسمك" class="welcome-input">
-                        </div>
                         <p class="welcome-text">
                             <span class="font-bold text-slate-900">{{ userName ? 'أهلاً ' + userName : 'أهلاً' }}</span>
                             <span class="text-slate-500">• {{ currentGreetingText }}</span>
@@ -611,6 +607,15 @@
                         </div>
                     </div>
 
+                    <div class="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                        <label for="appUserName" class="block text-xs font-bold text-slate-800">اسم العرض</label>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input id="appUserName" v-model="userName" @blur="syncUserNameToAccount" @keydown.enter.prevent="syncUserNameToAccount" type="text" maxlength="30" placeholder="اكتب اسمك" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-800">
+                            <button @click="syncUserNameToAccount" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">حفظ الاسم</button>
+                        </div>
+                        <p class="text-[11px] text-slate-500">سيظهر الاسم المحفوظ في أعلى الصفحة مع حسابك.</p>
+                    </div>
+
                     <!-- Notification Toggle Box -->
                     <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
                         <div>
@@ -774,7 +779,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+        import { getAuth, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
         // Firebase Configuration Setup
@@ -855,7 +860,7 @@
             computed: {
                 currentGreetingText() {
                     const hour = new Date().getHours();
-                    return hour < 12 ? 'صباح الخير' : 'مساء الخير';
+                    return hour < 12 ? 'صباحك سعيد' : 'مساؤك سعيد';
                 },
                 currentDate() {
                     return new Date().toLocaleDateString('ar-EG', {
@@ -1008,15 +1013,48 @@
                         onAuthStateChanged(auth, (user) => {
                             if (user) {
                                 this.currentUserId = user.uid;
+                                const savedName = user.displayName || this.challenge.userProfile?.name || '';
+                                this.userName = savedName.trim();
+                                if (this.challenge.userProfile) {
+                                    this.challenge.userProfile.name = this.userName || 'المستخدم النشط';
+                                }
                                 this.currentStep = this.challenge.isCreated ? 'dashboard' : 'setup';
                                 this.listenToFirestoreChallenge();
                             } else {
                                 this.currentUserId = null;
+                                this.userName = '';
                                 window.location.href = 'login.html';
                             }
                         });
                     } catch (err) {
                         console.error("Firebase auth error:", err);
+                    }
+                },
+                async syncUserNameToAccount() {
+                    if (!auth.currentUser) return;
+
+                    const trimmedName = (this.userName || '').trim();
+                    if (!trimmedName) {
+                        this.userName = auth.currentUser.displayName || this.challenge.userProfile?.name || '';
+                        return;
+                    }
+
+                    if (auth.currentUser.displayName === trimmedName) {
+                        this.challenge.userProfile.name = trimmedName;
+                        return;
+                    }
+
+                    try {
+                        await updateProfile(auth.currentUser, { displayName: trimmedName });
+                        this.userName = trimmedName;
+                        if (this.challenge.userProfile) {
+                            this.challenge.userProfile.name = trimmedName;
+                        }
+                        await this.saveToFirestore();
+                    } catch (error) {
+                        console.error('Error updating user display name:', error);
+                        alert('تعذر تحديث اسم المستخدم في الحساب، حاول مرة أخرى.');
+                        this.userName = auth.currentUser.displayName || this.challenge.userProfile?.name || '';
                     }
                 },
                 async logout() {
@@ -1031,6 +1069,9 @@
                         if (snapshot.exists()) {
                             const data = snapshot.data();
                             this.challenge = Object.assign({}, this.challenge, data);
+                            if (!this.userName && data.userProfile?.name) {
+                                this.userName = data.userProfile.name;
+                            }
                             if (data.simulatedToday) {
                                 this.simulatedToday = data.simulatedToday;
                             }
