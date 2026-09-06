@@ -1,4 +1,4 @@
-رbody {
+body {
     font-family: 'IBM Plex Sans Arabic', sans-serif;
     margin: 0;
     min-height: 100vh;
@@ -77,63 +77,31 @@
     border-color: #fbcaca;
 }
 
-.welcome-box {
+.account-copy {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
-    margin-top: 4px;
 }
 
-.welcome-label {
-    font-size: 23px;
-    font-weight: 700;
-    color: #111827;
-}
-
-#welcomeName {
-    font-size: clamp(28px, 3vw, 40px);
-}
-
-#welcomeMessage {
-    font-size: 18px;
-    color: #4b5563;
-}
-
-#welcomeName, #welcomeMessage {
+.account-title {
     margin: 0;
-}
-
-#welcomeName {
+    font-size: clamp(28px, 3vw, 40px);
     font-weight: 800;
     color: #111827;
     line-height: 1.2;
 }
 
-#welcomeMessage {
+.account-subtitle {
+    margin: 0;
+    font-size: 17px;
+    color: #4b5563;
     font-weight: 500;
     word-break: break-word;
 }
 
-#userName {
-    border: none;
-    border-bottom: 2px solid #dbe3ee;
-    background: transparent;
-    font-size: 20px;
-    padding: 6px 4px;
-    outline: none;
+.label {
+    font-weight: 700;
     color: #111827;
-    min-width: 180px;
-    font-family: 'IBM Plex Sans Arabic', sans-serif;
-}
-
-#userName::placeholder {
-    color: #94a3b8;
-}
-
-.account-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
 }
 
 .account-icon {
@@ -175,21 +143,6 @@
     transition: transform 0.2s ease;
 }
 
-.site-footer {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    padding: 14px 16px 10px;
-    margin-top: 18px;
-}
-
-.site-footer__text {
-    font-size: 15px;
-    font-weight: 600;
-    color: #475569;
-    letter-spacing: 0.2px;
-}
-
 @media (max-width: 680px) {
     .account-panel {
         padding: 18px 14px 20px;
@@ -207,14 +160,5 @@
 
     .account-icon {
         align-self: flex-end;
-    }
-
-    .welcome-box {
-        flex-wrap: wrap;
-    }
-
-    #userName {
-        min-width: 140px;
-        width: 100%;
     }
 }

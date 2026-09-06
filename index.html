@@ -43,18 +43,20 @@
 
         <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
             <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
-                <div class="flex items-center space-x-3 space-x-reverse cursor-pointer" @click="goHome">
-                    <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-md">
-                        <i class="fa-solid fa-trophy text-lg text-amber-400"></i>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h1 class="text-lg font-extrabold text-slate-900">تحدياتي</h1>
-                            <span v-if="syncStatus === 'synced'" class="w-2.5 h-2.5 rounded-full bg-emerald-500" title="متزامن مع السحابة"></span>
-                            <span v-else-if="syncStatus === 'syncing'" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" title="جاري المزامنة..."></span>
-                            <span v-else class="w-2.5 h-2.5 rounded-full bg-slate-300" title="غير متصل"></span>
+                <div class="flex items-center gap-3 min-w-0">
+                    <button @click="currentStep = 'settings'" class="settings-button" title="الإعدادات" aria-label="الإعدادات">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+
+                    <div class="welcome-header">
+                        <div class="welcome-box">
+                            <label for="appUserName" class="welcome-label">اهلاً</label>
+                            <input id="appUserName" v-model="userName" type="text" maxlength="30" placeholder="اكتب اسمك" class="welcome-input">
                         </div>
-                        <p class="text-[11px] text-slate-500 font-medium">مزامنة سحابية وإشعارات حية</p>
+                        <p class="welcome-text">
+                            <span class="font-bold text-slate-900">{{ userName ? 'أهلاً ' + userName : 'أهلاً' }}</span>
+                            <span class="text-slate-500">• {{ currentGreetingText }}</span>
+                        </p>
                     </div>
                 </div>
 
@@ -79,13 +81,6 @@
                         class="px-3 py-1.5 rounded-xl border border-transparent text-xs transition flex items-center gap-1.5">
                         <i class="fa-solid fa-list-check"></i>
                         <span class="hidden sm:inline">الأدوات والمهام</span>
-                    </button>
-
-                    <button v-if="challenge.isCreated" @click="currentStep = 'settings'" 
-                        :class="currentStep === 'settings' ? 'bg-slate-900 text-white font-bold shadow-sm' : 'text-slate-600 hover:bg-slate-100'"
-                        class="px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 border border-slate-200">
-                        <i class="fa-solid fa-gear"></i>
-                        <span>الإعدادات</span>
                     </button>
                 </div>
             </div>
@@ -124,20 +119,6 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-800 mb-1">تاريخ النهاية <span class="text-rose-500">*</span></label>
                                 <input type="date" v-model="form.endDate" :min="form.startDate" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 transition text-xs font-bold">
-                            </div>
-                        </div>
-
-                        <!-- Day Selection Filter (Specific Days) -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-800 mb-1">أيام النشاط المحددة بالجدول <span class="text-rose-500">*</span></label>
-                            <p class="text-[11px] text-slate-500 mb-2">سيعرض جدول التحدي هذه الأيام المحددة حصراً لمنع التشتت بباقي الأيام.</p>
-                            <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                                <button type="button" v-for="day in weekDays" :key="day.id" @click="toggleDaySelection(day.id)"
-                                    :class="form.selectedDays.includes(day.id) ? 'bg-slate-900 text-white font-bold border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
-                                    class="py-2 px-1 text-center border rounded-xl transition text-xs flex flex-col items-center justify-center gap-1">
-                                    <span>{{ day.short }}</span>
-                                    <i :class="form.selectedDays.includes(day.id) ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-300'" class="fa-solid text-[10px]"></i>
-                                </button>
                             </div>
                         </div>
 
@@ -786,7 +767,7 @@
 
         <!-- Footer -->
         <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 mt-8">
-            <p>منصة تحدياتي - متزامنة حياً عبر Cloud Firestore مع دعم الإشعارات</p>
+            <p>سمية • <span>{{ currentDate }}</span></p>
         </footer>
 
     </div>
@@ -818,6 +799,7 @@
             data() {
                 return {
                     currentStep: 'setup', // 'setup', 'builder', 'dashboard', 'settings'
+                    userName: '',
                     showStatsModal: false,
                     showRewardModal: false,
                     showFailureModal: false,
@@ -871,6 +853,17 @@
                 }
             },
             computed: {
+                currentGreetingText() {
+                    const hour = new Date().getHours();
+                    return hour < 12 ? 'صباح الخير' : 'مساء الخير';
+                },
+                currentDate() {
+                    return new Date().toLocaleDateString('ar-EG', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    });
+                },
                 totalDaysCount() {
                     if (!this.challenge.startDate || !this.challenge.endDate) return 0;
                     const start = new Date(this.challenge.startDate);
