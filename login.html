@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen font-ibm">
-    <main id="auth-app" class="auth-page">
+    <main id="auth-app" class="auth-page" v-cloak>
         <section class="auth-card">
             <div class="text-center mb-6">
                 <div class="auth-logo"><i class="fa-solid fa-trophy text-xl"></i></div>
@@ -25,7 +25,14 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-800 mb-1">كلمة المرور</label>
-                    <input v-model="password" class="auth-input" type="password" required minlength="6" autocomplete="current-password" placeholder="6 أحرف على الأقل">
+                    <div class="password-field">
+                        <input v-model="password" class="auth-input password-input" :type="showPassword ? 'text' : 'password'" required minlength="6" autocomplete="current-password" placeholder="6 أحرف على الأقل">
+                        <button type="button" class="password-toggle" @click="showPassword = !showPassword"
+                            :aria-label="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'"
+                            :title="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'">
+                            <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                        </button>
+                    </div>
                 </div>
                 <p v-if="error" class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">{{ error }}</p>
                 <button type="submit" :disabled="loading" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-sm transition">
@@ -64,7 +71,7 @@
         const { createApp } = Vue;
 
         createApp({
-            data: () => ({ mode: 'login', email: '', password: '', loading: false, error: '' }),
+            data: () => ({ mode: 'login', email: '', password: '', showPassword: false, loading: false, error: '' }),
             mounted() {
                 onAuthStateChanged(auth, user => {
                     if (user) window.location.href = 'index.html';
