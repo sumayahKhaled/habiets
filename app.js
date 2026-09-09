@@ -24,13 +24,35 @@ createApp({
     data() {
         return {
             currentStep: 'setup', // 'setup', 'builder', 'dashboard', 'settings'
+            challengeLoadComplete: false,
             userName: '',
+            userEmail: '',
             showStatsModal: false,
             showRewardModal: false,
             notificationsEnabled: false,
             notificationTime: '20:00',
             notificationTimer: null,
             siteUpdates: [
+                {
+                    id: 'site-2026-09-09-user-profile-card',
+                    text: 'استبدال عرض معرف Firebase ببطاقة تعرض اسم المستخدم والبريد الإلكتروني المسجل فقط.',
+                    date: '2026-09-09T22:33:38+03:00'
+                },
+                {
+                    id: 'site-2026-09-09-favicon-daily-checkbox-tasks',
+                    text: 'إضافة أيقونة للموقع واستبدال ملاحظات التحدي بمهام يومية مستقلة على شكل checkboxes لا تدخل في التتبع.',
+                    date: '2026-09-09T22:26:11+03:00'
+                },
+                {
+                    id: 'site-2026-09-09-challenge-color-save-tasks',
+                    text: 'استبدال صورة التحدي باختيار لون، ونقل زر الحفظ أسفل المهام وتسميته حفظ مهام التحدي.',
+                    date: '2026-09-09T22:16:16+03:00'
+                },
+                {
+                    id: 'site-2026-09-09-challenge-loading-final-save-solid-color',
+                    text: 'إصلاح ظهور لا يوجد تحدي أثناء التحميل، وإضافة حفظ نهائي ينتظر المزامنة، واستبدال خلفية لوحة التحدي بلون ثابت.',
+                    date: '2026-09-09T22:11:14+03:00'
+                },
                 {
                     id: 'site-2026-09-08-collapsible-updates-name-save',
                     text: 'جعل تحديثات الموقع قابلة للطي وإضافة تأثير حفظ وتبديل إلى تعديل في اسم العرض.',
@@ -139,6 +161,7 @@ createApp({
             textInputs: {},
             yesNoInputs: {},
             linkedTextInputs: {},
+            dailyTaskTitle: '',
             weekDays: [
                 { id: 0, name: 'الأحد', short: 'أحد' },
                 { id: 1, name: 'الإثنين', short: 'إثنين' },
@@ -152,6 +175,7 @@ createApp({
                 title: '',
                 description: '',
                 image: '',
+                color: '#0f172a',
                 connectionMode: 'separate',
                 linkedToChallengeId: '',
                 startDate: new Date().toISOString().split('T')[0],
@@ -173,12 +197,14 @@ createApp({
                 title: '',
                 description: '',
                 image: '',
+                color: '#0f172a',
                 linkedToChallengeId: null,
                 startDate: '',
                 endDate: '',
                 selectedDays: [],
                 reward: '',
                 tasks: [],
+                dailyTasks: {},
                 logs: {},
                 notes: '',
                 updates: [],
@@ -370,6 +396,7 @@ createApp({
                         this.currentUserId = user.uid;
                         const savedName = user.displayName || '';
                         this.userName = savedName.trim();
+                        this.userEmail = user.email || '';
                         if (this.challenge.userProfile) {
                             this.challenge.userProfile.name = this.userName || 'المستخدم النشط';
                         }
@@ -378,6 +405,7 @@ createApp({
                     } else {
                         this.currentUserId = null;
                         this.userName = '';
+                        this.userEmail = '';
                         window.location.href = 'login.html';
                     }
                 });
@@ -439,8 +467,10 @@ createApp({
                     if (Array.isArray(data.challengeCatalog) && data.challengeCatalog.length > 0) {
                         this.challengeCatalog = data.challengeCatalog;
                         this.activeChallengeId = data.activeChallengeId || this.challengeCatalog[0].id;
-                        const activeChallenge = this.challengeCatalog.find(item => item.id === this.activeChallengeId);
+                        const activeChallenge = this.challengeCatalog.find(item => item.id === this.activeChallengeId)
+                            || this.challengeCatalog[0];
                         if (activeChallenge) {
+                            this.activeChallengeId = activeChallenge.id;
                             this.challenge = Object.assign({}, this.challenge, activeChallenge);
                         }
                     } else {
@@ -463,14 +493,19 @@ createApp({
                     }
                     if (this.challenge.isCreated) {
                         this.syncTodayWithCalendar();
-                        if (this.currentStep === 'setup') {
+                        if (!this.editingChallengeId && this.currentStep === 'setup') {
                             this.currentStep = 'dashboard';
                         }
                     }
+                    this.challengeLoadComplete = true;
                     this.syncStatus = 'synced';
+                }
+                else {
+                    this.challengeLoadComplete = true;
                 }
             }, (error) => {
                 console.error("Firestore listener error:", error);
+                this.challengeLoadComplete = true;
                 this.syncStatus = 'offline';
             });
         },
@@ -492,9 +527,11 @@ createApp({
 
                 await setDoc(challengeDocRef, dataToSave, { merge: true });
                 this.syncStatus = 'synced';
+                return true;
             } catch (e) {
                 console.error("Error saving to Firestore:", e);
                 this.syncStatus = 'offline';
+                return false;
             }
         },
         syncActiveChallengeToCatalog() {
@@ -645,11 +682,43 @@ createApp({
                 return d ? d.short : '';
             }).join(' • ');
         },
+        getDailyTasks(dateStr) {
+            return this.challenge.dailyTasks?.[dateStr] || [];
+        },
+        addDailyTask() {
+            const title = (this.dailyTaskTitle || '').trim();
+            if (!title) return;
+            if (!this.challenge.dailyTasks) this.challenge.dailyTasks = {};
+            if (!this.challenge.dailyTasks[this.simulatedToday]) {
+                this.challenge.dailyTasks[this.simulatedToday] = [];
+            }
+            this.challenge.dailyTasks[this.simulatedToday].push({
+                id: `daily-${Date.now()}`,
+                title,
+                completed: false
+            });
+            this.dailyTaskTitle = '';
+            this.saveToFirestore();
+        },
+        toggleDailyTask(taskId) {
+            const task = this.getDailyTasks(this.simulatedToday).find(item => item.id === taskId);
+            if (!task) return;
+            task.completed = !task.completed;
+            this.saveToFirestore();
+        },
+        removeDailyTask(taskId) {
+            const tasks = this.getDailyTasks(this.simulatedToday);
+            const index = tasks.findIndex(item => item.id === taskId);
+            if (index === -1) return;
+            tasks.splice(index, 1);
+            this.saveToFirestore();
+        },
         resetChallengeForm() {
             this.form = {
                 title: '',
                 description: '',
                 image: '',
+                color: '#0f172a',
                 connectionMode: 'separate',
                 linkedToChallengeId: '',
                 startDate: new Date().toISOString().split('T')[0],
@@ -668,12 +737,14 @@ createApp({
                 title: this.form.title,
                 description: this.form.description,
                 image: this.form.image,
+                color: this.form.color,
                 linkedToChallengeId,
                 startDate: this.form.startDate,
                 endDate: this.form.endDate,
                 selectedDays: [...this.form.selectedDays],
                 reward: this.form.reward,
                 tasks: [],
+                dailyTasks: {},
                 logs: {},
                 notes: '',
                 updates: [],
@@ -694,6 +765,7 @@ createApp({
                     title: this.form.title,
                     description: this.form.description,
                     image: this.form.image,
+                    color: this.form.color,
                     linkedToChallengeId: this.form.connectionMode === 'linked' ? this.form.linkedToChallengeId || null : null,
                     startDate: this.form.startDate,
                     endDate: this.form.endDate,
@@ -720,10 +792,10 @@ createApp({
             this.saveToFirestore();
             this.currentStep = 'builder';
         },
-        finishTaskBuilderAndGoToDashboard() {
+        async finishTaskBuilderAndGoToDashboard() {
             this.simulatedToday = this.getFirstActiveDate(this.challenge.startDate, this.challenge.selectedDays);
-            this.saveToFirestore();
-            this.currentStep = 'dashboard';
+            const saved = await this.saveToFirestore();
+            if (saved !== false) this.currentStep = 'dashboard';
         },
         addNewTask() {
             if (!this.newTask.title.trim()) return;
@@ -1089,6 +1161,7 @@ createApp({
                 title: this.challenge.title || '',
                 description: this.challenge.description || '',
                 image: this.challenge.image || '',
+                color: this.challenge.color || '#0f172a',
                 connectionMode: this.challenge.linkedToChallengeId ? 'linked' : 'separate',
                 linkedToChallengeId: this.challenge.linkedToChallengeId || '',
                 startDate: this.challenge.startDate,
@@ -1164,6 +1237,7 @@ createApp({
                 selectedDays: [],
                 reward: '',
                 tasks: [],
+                dailyTasks: {},
                 logs: {},
                 notes: '',
                 simulatedToday: new Date().toISOString().split('T')[0],

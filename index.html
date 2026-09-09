@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة تحدياتي - بناء وتتبع التحديات مع Firebase</title>
+    <title>تحديات سُمية </title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="tailwind.generated.css">
     <!-- Vue 3 CDN -->
@@ -83,7 +84,13 @@
         <!-- Main Body Container -->
         <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-grow">
 
-            <section v-if="currentStep === 'setup'" class="max-w-2xl mx-auto">
+            <section v-if="currentStep === 'setup' && !challengeLoadComplete" class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center text-sm text-slate-500">
+                    جاري تحميل تحديك...
+                </div>
+            </section>
+
+            <section v-else-if="currentStep === 'setup'" class="max-w-2xl mx-auto">
                 <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
                     <div class="mb-6 text-center">
                         <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl">
@@ -116,16 +123,12 @@
                         </div>
 
                         <div>
-                            <label for="challengeImage" class="block text-xs font-bold text-slate-800 mb-1">صورة التحدي</label>
-                            <label for="challengeImage"
-                                class="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold cursor-pointer hover:bg-slate-50 transition">
-                                <i class="fa-solid fa-image text-sky-600 text-base"></i>
-                                <span>{{ form.image ? 'تغيير صورة التحدي' : 'اختيار صورة التحدي' }}</span>
-                            </label>
-                            <input id="challengeImage" type="file" accept="image/*" @change="handleChallengeImageUpload" class="sr-only">
-                            <img v-if="form.image" :src="form.image" alt="معاينة صورة التحدي"
-                                class="mt-3 w-full h-40 object-cover rounded-xl border border-slate-200">
-                            <p class="text-[11px] text-slate-400 mt-1">اختياري. ستظهر الصورة أعلى لوحة التحدي.</p>
+                            <label for="challengeColor" class="block text-xs font-bold text-slate-800 mb-1">لون التحدي</label>
+                            <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white">
+                                <input id="challengeColor" v-model="form.color" type="color"
+                                    class="w-12 h-10 rounded-lg border border-slate-200 bg-white cursor-pointer">
+                                <span class="text-xs font-bold text-slate-600">اختاري لون خلفية لوحة التحدي</span>
+                            </div>
                         </div>
 
                         <div class="p-4 rounded-xl border border-sky-200 bg-sky-50/50 space-y-3">
@@ -207,11 +210,6 @@
                                 title="رجوع لبيانات التحدي" aria-label="رجوع لبيانات التحدي"
                                 class="w-10 h-10 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition flex items-center justify-center">
                                 <i class="fa-solid fa-arrow-right"></i>
-                            </button>
-                            <button @click="finishTaskBuilderAndGoToDashboard"
-                                title="حفظ التحدي والانتقال للتتبع" aria-label="حفظ التحدي والانتقال للتتبع"
-                                class="w-10 h-10 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center justify-center">
-                                <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i>
                             </button>
                         </div>
                     </div>
@@ -368,6 +366,10 @@
                                     </div>
                                 </div>
                             </div>
+                            <button @click="finishTaskBuilderAndGoToDashboard"
+                                class="w-full mt-4 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition">
+                                حفظ مهام التحدي
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -376,9 +378,8 @@
             <section v-else-if="currentStep === 'dashboard'" class="space-y-6">
 
                 <!-- Clean, Solid Header Banner with Cloud Status -->
-                <div class="bg-slate-900 text-white rounded-2xl shadow-md relative overflow-hidden bg-cover bg-center"
-                    :style="challenge.image ? { backgroundImage: `url('${challenge.image}')` } : {}">
-                    <div class="absolute inset-0 bg-slate-950/65"></div>
+                <div class="text-white rounded-2xl shadow-md relative overflow-hidden"
+                    :style="{ backgroundColor: challenge.color || '#0f172a' }">
 
                     <div class="relative z-10 p-5 sm:p-8">
                         <div class="flex flex-col sm:flex-row items-center justify-between gap-5">
@@ -758,17 +759,40 @@
                     <!-- Right Column: Notes & Quick Links -->
                     <div class="space-y-6">
 
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm mb-1 flex items-center gap-2">
-                                <i class="fa-solid fa-note-sticky text-amber-500"></i>
-                                <span>ملاحظات ومدونة التحدي</span>
-                            </h3>
-                            <p class="text-[11px] text-slate-500 mb-3">سجل انطباعاتك اليومية وعزيمتك طوال التحدي (تتزامن
-                                فوراً)</p>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                                        <i class="fa-solid fa-list-check text-sky-600"></i>
+                                        <span>مهام اليوم الإضافية</span>
+                                    </h3>
+                                    <p class="text-[11px] text-slate-500 mt-1">مهام خاصة بتاريخ {{ formatDateArabic(simulatedToday) }} ولا تدخل ضمن تتبع التحدي.</p>
+                                </div>
+                                <span class="text-[10px] text-slate-400 font-bold">{{ getDailyTasks(simulatedToday).length }} مهام</span>
+                            </div>
 
-                            <textarea v-model="challenge.notes" @input="saveToFirestore" @blur="recordUpdate('تم تعديل ملاحظات التحدي'); saveToFirestore()" rows="6"
-                                placeholder="اكتب ملاحظاتك هنا..."
-                                class="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-slate-800 bg-slate-50 text-slate-800"></textarea>
+                            <form @submit.prevent="addDailyTask" class="flex gap-2">
+                                <input v-model="dailyTaskTitle" type="text" required placeholder="أضف مهمة لهذا اليوم..."
+                                    class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 bg-slate-50">
+                                <button type="submit" title="إضافة مهمة اليوم"
+                                    class="w-10 shrink-0 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition flex items-center justify-center">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </form>
+
+                            <div v-if="getDailyTasks(simulatedToday).length" class="space-y-2 pt-1">
+                                <label v-for="task in getDailyTasks(simulatedToday)" :key="task.id"
+                                    class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer">
+                                    <input type="checkbox" :checked="task.completed" @change="toggleDailyTask(task.id)"
+                                        class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500">
+                                    <span :class="task.completed ? 'line-through text-slate-400' : 'text-slate-700'"
+                                        class="flex-1 text-xs font-semibold">{{ task.title }}</span>
+                                    <button type="button" @click="removeDailyTask(task.id)" title="حذف المهمة"
+                                        class="text-slate-400 hover:text-rose-600 transition">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </label>
+                            </div>
                         </div>
 
                         <!-- Manage Tasks Card -->
@@ -815,11 +839,11 @@
                         <div class="flex items-center gap-3">
                             <div
                                 class="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                                <i class="fa-solid fa-cloud"></i>
+                                <i class="fa-solid fa-user"></i>
                             </div>
                             <div>
-                                <h3 class="font-bold text-sm text-slate-800">حساب Firebase المتصل</h3>
-                                <p class="text-xs text-slate-500 break-all">معرف المستخدم: {{ currentUserId || 'جاري الاتصال...' }}</p>
+                                <h3 class="font-bold text-sm text-slate-800">{{ userName || 'المستخدم' }}</h3>
+                                <p class="text-xs text-slate-500 break-all">{{ userEmail || 'جاري تحميل البريد الإلكتروني...' }}</p>
                             </div>
                         </div>
 
